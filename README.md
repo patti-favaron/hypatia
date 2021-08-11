@@ -39,3 +39,9 @@ As the mainstream technology would suggest, all meteorological quantities read b
 In reality, all meteorological quantities (you may think wind and temperature as intuitive examples) are subject to turbulent fluctuations, so that large natural variations in data could be appreciated even at time scales in the order of one tenth of a second or less. The fact this variation is not seen at the output clamp of mainstream sensors comes from a (desired or not) design decision: mainstream sensors act as low-pass filters. The filter cut frequency stems from moments of inertia of the sensor parts, frictions, thermal inertias, and the like. Sensor designers can control them, to some degree: practical constraints need also to be taken into account, first and foremost that the sensor is robust enough to survive the usually harsh meteorological environments on this planet.
 
 In addition to the intrinsic turbulent variation of meteorological quantities, it may (and does) happen that changes in measured vaues occur because of electrical phenomena possibly occurring at any level of the measurement chain. We may conceptualize this part of variation not being natural, but the consequence of some failure, either temporary of definitive. Although not "natural", this variation is not unexpected: after all, any sensor can be thought as a sort of natural rock, and geologists tell us all rock weather, sooner or later. Wait anough, and any manufact will fail, as its components deteriorate by rock weathering.
+
+Things are more complex in the real world, and yet we may be quite sure of a thing: sensor readings contain some intrinsic variation whose extent may change with time. By collecting readings on every 10 or 30 seconds we are not in the best place to appreciate it.
+
+But nothing prevents from oversampling.
+
+If we, for example, gather data on every second, 
