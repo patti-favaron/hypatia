@@ -23,6 +23,12 @@ const uint32_t SAMPLE_INTERVAL_MS = 1000;
 const int STEPS_TO_LOG = 10;
 int iNumSteps = 1;
 
+// Multi-color LED
+#define RED   22
+#define GREEN 23
+#define BLUE  24
+
+
 ////////////////////////////////////////////////////////
 ////////// Initialization of critical devices //////////
 ////////////////////////////////////////////////////////
@@ -329,45 +335,52 @@ void get_pressure(void) {
 
 void setup() {
 
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, HIGH);
+  pinMode(RED, OUTPUT);
+  pinMode(GREEN, OUTPUT);
+  pinMode(BLUE, OUTPUT);
+  digitalWrite(RED,   HIGH);
+  digitalWrite(GREEN, HIGH);
+  digitalWrite(BLUE,  HIGH);
   pinMode(buttonPin, INPUT);
   
   Serial.begin(9600);
-  // while(!Serial);
 
+  // Start thermo-hygro-barometer
   Wire.begin();
   mySensor.setI2CAddress(0x76);
 
   // Start GNSS unit - waiting until it's fully ON
   startGNSS((uint16_t)250);
-  digitalWrite(LED_BUILTIN, HIGH);
+  digitalWrite(BLUE, LOW);
 
   // Set internal processor RTC
   setDateTime();
   
   // Start SD
   startSD();
-  digitalWrite(LED_BUILTIN, HIGH);
+  digitalWrite(RED, LOW);
   logInfo("Acquisition started, with GNSS time set");
   
   // Start BME-280
   if (mySensor.beginI2C() == false) //Begin communication over I2C
   {
     Serial.println("The sensor did not respond. Please check wiring.");
+    digitalWrite(BLUE, HIGH);
+    digitalWrite(GREEN, HIGH);
     while(1) {
-      digitalWrite(LED_BUILTIN, HIGH);
+      digitalWrite(RED, LOW);
       delay(200);
-      digitalWrite(LED_BUILTIN, LOW);
+      digitalWrite(RED, HIGH);
       delay(200);
     }; //Freeze
   }
-  digitalWrite(LED_BUILTIN, HIGH);
+  digitalWrite(BLUE, LOW);
+  digitalWrite(RED, HIGH);
 
   // Start on a multiple of the sample interval.
   logTime = micros()/(1000UL*SAMPLE_INTERVAL_MS) + 1;
   logTime *= 1000UL*SAMPLE_INTERVAL_MS;
-  digitalWrite(LED_BUILTIN, LOW);
+  digitalWrite(BLUE, HIGH);
     
 }
 
@@ -399,7 +412,9 @@ void loop() {
   if(buttonState == 0) {
     
     // No pushbutton pressed, and writing file: get measurements
-    digitalWrite(LED_BUILTIN, LOW);
+    digitalWrite(RED, HIGH);
+    digitalWrite(BLUE, HIGH);
+    digitalWrite(GREEN, HIGH);
     
     // Query GPS for position and time reference data.
     getGNSSdata((uint16_t)250);
@@ -408,10 +423,10 @@ void loop() {
     get_pressure();
 
     // Log data to MicroSD
-    digitalWrite(LED_BUILTIN, HIGH);
+    digitalWrite(BLUE, LOW);
     writeData();
     delay(50);
-    digitalWrite(LED_BUILTIN, LOW);
+    digitalWrite(BLUE, HIGH);
   
     // Dump data to serial line
     char line[256];
@@ -429,7 +444,7 @@ void loop() {
     
     // Button pressed: LED on, and stop processing: will restart
     // after power off->on or RESET.
-    digitalWrite(LED_BUILTIN, HIGH);
+    digitalWrite(GREEN, LOW);
     while(1);
     
   }
