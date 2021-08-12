@@ -43,7 +43,7 @@ double lat, lon, alt, hAccuracy, vAccuracy;
 
 //------------------------------------------------------------------------------
 // MicroSD-related
-const uint8_t chipSelect = SDCARD_SS_PIN;
+const uint8_t chipSelect = 10;
 /*
 SdFat sd;
 SdFile file;
@@ -52,7 +52,7 @@ SdFile logfile;
 
 char fileName[13] = "M0000000.csv";
 char logName[13]  = "L0000000.log";
-const int buttonPin = 6;
+const int buttonPin = 3;
 int buttonState = 0;
 
 ////////////////////////////////////////////////////////////
@@ -66,14 +66,7 @@ int buttonState = 0;
 #define FAHRENHEIT_SCALE 1
 
 BME280 mySensor;
-BME280_SensorMeasurements measurements;
-bool is_pressure = true;  // Assume sensor is present
-double Ta, Hrel, Pa;
-
-// Particulate matter sensor
-#include "SdsDustSensor.h"
-SdsDustSensor sds(Serial1); // passing HardwareSerial& as parameter
-float pm25, pm10;
+double Ta, HRel, Pa;
 
 // Actual time
 uint32_t logTime;
@@ -201,7 +194,6 @@ bool getGNSSdata(uint16_t maxWait) {
   myGNSS.packetUBXNAVPVT->moduleQueried.moduleQueried1.bits.vAcc = false;
   lat = (double)myGNSS.packetUBXNAVPVT->data.lat * 1.e-7;
   lon = (double)myGNSS.packetUBXNAVPVT->data.lon * 1.e-7;
-
   
   alt = (double)myGNSS.packetUBXNAVPVT->data.hMSL * 1.e-3;
   hAccuracy = (double)myGNSS.packetUBXNAVPVT->data.hAcc * 1.e-3;
@@ -272,7 +264,7 @@ void newFile(void) {
 
   // Write data header.
   file = SD.open(fileName, FILE_WRITE);
-  file.println("Time.Stamp,Lat,Lon,Z,hAcc,vAcc,Pa,Ta,Temp,HRel,PM10,PM2.5");
+  file.println("Time.Stamp,Lat,Lon,Z,hAcc,vAcc,Pa,Ta,HRel");
   file.close();
 
 }
@@ -292,10 +284,7 @@ void writeData(void) {
     file.print(","); file.print(vAccuracy, 3);
     file.print(","); file.print(Pa, 3);
     file.print(","); file.print(Ta, 3);
-    file.print(","); file.print(temperature, 2);
-    file.print(","); file.print(humidity, 2);
-    file.print(","); file.print(pm10, 3);
-    file.print(","); file.print(pm25, 3);
+    file.print(","); file.print(HRel, 2);
     file.println();
     file.close();
   }
@@ -327,34 +316,9 @@ void logWarning(const char* sMessage) {
 
 void get_pressure(void) {
   
-  char status = pressure.startTemperature();
-  if(status != 0) {
-    delay(status);  // Wait until measurement is complete
-    status = pressure.getTemperature(Ta);
-    if(status != 0) {
-      status = pressure.startPressure(3); // Max resolution by oversampling
-      if(status != 0) {
-        delay(status);
-        status = pressure.getPressure(Pa, Ta);
-        if(status == 0) {
-          Ta = -9999.9;
-          Pa = -9999.9;
-        }
-      }
-      else {
-        Ta = -9999.9;
-        Pa = -9999.9;
-      }
-    }
-    else {
-      Ta = -9999.9;
-      Pa = -9999.9;
-    }
-  }
-  else {
-    Ta = -9999.9;
-    Pa = -9999.9;
-  }
+  Ta = mySensor.readTempC();
+  HRel = mySensor.readFloatHumidity();
+  Pa = mySensor.readFloatPressure() / 100.0;
   
 }
 
@@ -430,29 +394,6 @@ void loop() {
   lLogInfo = iNumSteps == STEPS_TO_LOG;
   if(lLogInfo) iNumSteps = 1;
 
-  // Get battery voltage; if lower than safety
-  // limit (3.0V) stop acquisition
-  int voltageRawValue = analogRead(ADC_BATTERY);
-  float voltage = voltageRawValue * 4.3 / 1023.0;
-  char sBuffer[256];
-  sprintf(sBuffer, "Battery voltage = %f4.2 (minimum 3.0V)", voltage);
-  if(lLogInfo) logInfo(sBuffer);
-  if(voltage <= 3.0) {
-
-    logWarning("Battery voltage lower than 3.0V safety limit: closing files");
-    while(1) {
-      digitalWrite(LED_BUILTIN, HIGH);
-      delay(600);
-      digitalWrite(LED_BUILTIN, LOW);
-      delay(300);
-      digitalWrite(LED_BUILTIN, HIGH);
-      delay(300);
-      digitalWrite(LED_BUILTIN, LOW);
-      delay(600);
-    }
-    
-  }
-
   // Get button state and check for possible transition
   buttonState = digitalRead(buttonPin);
   if(buttonState == 0) {
@@ -464,28 +405,8 @@ void loop() {
     getGNSSdata((uint16_t)250);
   
     // Get pressure (and its auxiliary quantities) from external BMP180
-    if(is_pressure) {
-      get_pressure();
-      if(Pa < 0.0) logWarning("Pressure not read (temporary failure?)");
-    }
-    else {
-      Ta = -9999.9;
-      Pa = -9999.9;
-    }
+    get_pressure();
 
-    // SDS-011
-    PmResult pm = sds.queryPm();
-    if (pm.isOk()) {
-      pm25 = pm.pm25;
-      pm10 = pm.pm10;
-    } else {
-      pm25 = -9999.9f;
-      pm10 = -9999.9f;
-    }
-  
-    // Read SHT75
-    tempSensor.measure(&temperature, &humidity, &dewpoint);
-  
     // Log data to MicroSD
     digitalWrite(LED_BUILTIN, HIGH);
     writeData();
@@ -498,10 +419,9 @@ void loop() {
     Serial.print(line); Serial.print(",");
     Serial.print(hAccuracy); Serial.print(",");
     Serial.print(vAccuracy); Serial.print(",");
-    Serial.print(pm25); Serial.print(",");
-    Serial.print(pm10); Serial.print(",");
-    Serial.print(temperature); Serial.print(",");
-    Serial.print(humidity);
+    Serial.print(Ta); Serial.print(",");
+    Serial.print(HRel); Serial.print(",");
+    Serial.print(Pa);
     Serial.print("\n");
 
   }
